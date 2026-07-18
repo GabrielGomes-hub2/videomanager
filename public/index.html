@@ -1430,7 +1430,7 @@ function renderTrabalhos(){
   // calcular totais dos trabalhos filtrados
   const totalFiltrado=trabs.reduce((s,t)=>s+Number(t.valor||0),0);
   const totalPago=trabs.filter(t=>t.situacao==='pago').reduce((s,t)=>s+Number(t.valorPago||t.valor||0),0);
-  const totalNaoPago=trabs.filter(t=>t.situacao==='nao_pago').reduce((s,t)=>s+Number(t.valor||0),0);
+  const totalNaoPago=trabs.filter(t=>t.situacao==='nao_pago'||t.situacao==='em_fatura').reduce((s,t)=>s+(Number(t.valor||0)-Number(t.valorPago||0)),0);
   const totalEmFatura=trabs.filter(t=>t.situacao==='em_fatura').reduce((s,t)=>s+Number(t.valor||0),0);
   const totaisEl=document.getElementById('trab-totais');
   if(trabs.length){
