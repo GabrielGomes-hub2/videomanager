@@ -1122,10 +1122,8 @@ function renderDashboard(){
   const fatPago=faturas.filter(f=>f.status==='paga').reduce((s,f)=>s+(f.itens||[]).reduce((a,i)=>a+Number(i.valor||0),0),0);
   const totalRec=trabPago+cobPago+fatPago;
 
-  const trabPend=trabalhos.filter(t=>t.situacao==='nao_pago'||t.situacao==='em_fatura').reduce((s,t)=>s+Number(t.valor||0),0);
-  const cobPend=cobrancas.filter(c=>!c.pago).reduce((s,c)=>s+Number(c.valor||0),0);
-  const fatPend=faturas.filter(f=>f.status==='pendente'||f.status==='parcial').reduce((s,f)=>s+(f.itens||[]).reduce((a,i)=>a+Number(i.valor||0),0),0);
-  const totalPend=trabPend+cobPend+fatPend;
+  const trabalhosPendentes=trabalhos.filter(t=>t.situacao==='nao_pago'||t.situacao==='em_fatura');
+  const totalPend=trabalhosPendentes.reduce((soma,t)=>soma+(Number(t.valor||0)-Number(t.valorPago||0)),0);
 
   const clAtivos=DB.get('clientes').filter(c=>c.status==='ativo').length;
 
@@ -1627,10 +1625,14 @@ function saveEditTrabalho(){
   const idx=trabs.findIndex(x=>x.id===id);if(idx<0)return;
   trabs[idx].titulo=document.getElementById('etrab-titulo').value;
   trabs[idx].dataCaptacao=document.getElementById('etrab-captacao').value||trabs[idx].dataCaptacao;
-  trabs[idx].valor=parseFloat(document.getElementById('etrab-valor').value)||0;
-  trabs[idx].valorPago=parseFloat(document.getElementById('etrab-valor-pago').value)||0;
+  const valor=parseFloat(document.getElementById('etrab-valor').value)||0;
+  const situacao=document.getElementById('etrab-sit').value;
+  let valorPago=parseFloat(document.getElementById('etrab-valor-pago').value)||0;
+  if(situacao==='pago'&&!valorPago)valorPago=valor; // quitação total automática quando o campo não foi preenchido
+  trabs[idx].valor=valor;
+  trabs[idx].valorPago=valorPago;
   trabs[idx].entregaPrev=document.getElementById('etrab-entrega').value;
-  trabs[idx].situacao=document.getElementById('etrab-sit').value;
+  trabs[idx].situacao=situacao;
   trabs[idx].obs=document.getElementById('etrab-obs').value;
   DB.set('trabalhos',trabs);
   closeModal('modal-edittrab');
