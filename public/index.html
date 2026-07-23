@@ -243,7 +243,7 @@ input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--ac
       <label>Senha</label>
       <input type="password" id="login-pass" placeholder="senha" autocomplete="current-password" onkeydown="if(event.key==='Enter')fazerLogin()">
     </div>
-    <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:4px" onclick="fazerLogin()">Entrar</button>
+    <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:4px" id="btn-login">Entrar</button>
     <div id="login-error">Usuário ou senha incorretos.</div>
   </div>
 </div>
@@ -2989,8 +2989,17 @@ function verificarLogin(){
     document.getElementById('login-screen').style.display = 'none';
     return true;
   }
+  const ls = document.getElementById('login-screen');
+  if(ls) ls.style.display = 'flex';
   return false;
 }
+
+document.addEventListener('DOMContentLoaded', ()=>{
+  const btn = document.getElementById('btn-login');
+  if(btn) btn.addEventListener('click', fazerLogin);
+  const passInput = document.getElementById('login-pass');
+  if(passInput) passInput.addEventListener('keydown', e=>{ if(e.key==='Enter') fazerLogin(); });
+});
 
 function fazerLogin(){
   const u = document.getElementById('login-user').value.trim().toLowerCase();
@@ -3009,7 +3018,7 @@ function fazerLogin(){
 // INIT
 // =====================================================
 document.addEventListener('DOMContentLoaded', async ()=>{
-  if(!verificarLogin())return;
+  if(!verificarLogin()) return;
 
   // Carregar dados do servidor se online
   await DB.loadFromServer();
