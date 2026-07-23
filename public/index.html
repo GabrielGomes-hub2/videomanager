@@ -51,6 +51,76 @@ nav a.active svg{opacity:1}
 
 /* MAIN */
 #main{margin-left:var(--sidebar);flex:1;min-height:100vh;display:flex;flex-direction:column}
+
+/* ===== BOTTOM NAV (mobile only) ===== */
+#bottom-nav{display:none}
+#more-sheet{display:none}
+
+/* ===== MOBILE RESPONSIVE ===== */
+@media (max-width: 768px){
+  body{font-size:15px}
+  #sidebar{display:none}
+  #main{margin-left:0;padding-bottom:64px}
+  .page{padding:16px 14px}
+  .page-header{flex-wrap:wrap;gap:10px}
+  .page-title{font-size:17px}
+  .page-title small{display:block;margin-left:0;margin-top:2px}
+
+  /* stat cards stack 2-col */
+  .stats-grid{grid-template-columns:1fr 1fr!important;gap:8px}
+  .stat-card{padding:12px 14px}
+  .stat-card .value{font-size:18px}
+
+  /* tables -> cards */
+  .table-wrap table{display:block}
+  .table-wrap thead{display:none}
+  .table-wrap tbody{display:block}
+  .table-wrap tr{display:block;background:var(--bg3);border-radius:var(--radius);margin:0 10px 8px;padding:10px 12px;border-bottom:none!important}
+  .table-wrap tr.empty-row{background:none;text-align:center;padding:24px 0}
+  .table-wrap td{display:block;padding:3px 0;border-bottom:none;font-size:13px;white-space:normal}
+  .table-wrap td:empty{display:none}
+  .table-header{padding:12px 14px;flex-wrap:wrap;gap:8px}
+
+  /* search/filter bars stack */
+  .search-bar input{max-width:100%;width:100%}
+  .filters{width:100%}
+  .filters select{flex:1;min-width:0}
+
+  /* modal full screen */
+  .modal{width:100%;max-width:100%;max-height:100vh;height:100vh;border-radius:0;position:fixed;inset:0}
+  .modal-overlay{padding:0}
+  .form-row{grid-template-columns:1fr}
+
+  /* páginas com layout de duas/três colunas empilham */
+  #page-dashboard>div[style*="grid-template-columns:1fr 1fr"]{display:block!important}
+  #page-dashboard .table-wrap{margin-bottom:14px}
+  #page-agenda>div[style*="grid-template-columns:1fr 300px"]{display:block!important}
+  #page-orcamento [style*="grid-template-columns:1fr 360px"]{display:block!important}
+  #page-orcamento [style*="grid-template-columns:repeat(3,1fr)"]{grid-template-columns:1fr!important}
+  #page-orcamento [style*="grid-template-columns:1fr 1fr 1fr"]{grid-template-columns:1fr!important}
+  #pac-cards-grid{grid-template-columns:1fr!important}
+
+  /* bottom nav */
+  #bottom-nav{
+    display:flex;position:fixed;bottom:0;left:0;right:0;z-index:200;
+    background:var(--bg2);border-top:1px solid var(--border);
+    padding:6px 0 max(6px,env(safe-area-inset-bottom));
+    justify-content:space-around;
+  }
+  #bottom-nav .bn-item{
+    display:flex;flex-direction:column;align-items:center;gap:2px;
+    color:var(--text3);font-size:10px;cursor:pointer;flex:1;padding:4px 0;
+    background:none;border:none;font-family:var(--font);
+  }
+  #bottom-nav .bn-item.active{color:var(--accent)}
+  #bottom-nav .bn-item svg{width:20px;height:20px}
+
+  /* more sheet */
+  #more-sheet.open{display:flex;position:fixed;inset:0;z-index:600;background:rgba(0,0,0,.6);align-items:flex-end}
+  #more-sheet-inner{background:var(--bg2);width:100%;border-radius:16px 16px 0 0;padding:20px 16px calc(20px + env(safe-area-inset-bottom))}
+  #more-sheet-inner a{display:flex;align-items:center;gap:12px;padding:12px 8px;color:var(--text);text-decoration:none;font-size:14px;border-bottom:1px solid var(--border);cursor:pointer}
+  #more-sheet-inner a:last-child{border-bottom:none}
+}
 .page{display:none;flex:1;flex-direction:column;padding:28px 32px;overflow-y:auto;min-height:100vh}
 .page.active{display:flex}
 .page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:10px}
@@ -303,6 +373,40 @@ input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--ac
 </div>
 
 <div id="main">
+
+<!-- BOTTOM NAV MOBILE -->
+<div id="bottom-nav">
+  <button class="bn-item active" data-page="dashboard" onclick="bnNavigate('dashboard')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+    Início
+  </button>
+  <button class="bn-item" data-page="agenda" onclick="bnNavigate('agenda')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+    Agenda
+  </button>
+  <button class="bn-item" data-page="trabalhos" onclick="bnNavigate('trabalhos')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15.5 3H5a2 2 0 0 0-2 2v14c0 1.1.9 2 2 2h14a2 2 0 0 0 2-2V8.5L15.5 3z"/><path d="M15 3v6h6"/></svg>
+    Trabalhos
+  </button>
+  <button class="bn-item" data-page="clientes" onclick="bnNavigate('clientes')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+    Clientes
+  </button>
+  <button class="bn-item" onclick="toggleMoreSheet()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+    Mais
+  </button>
+</div>
+
+<!-- MORE SHEET MOBILE -->
+<div id="more-sheet" onclick="if(event.target===this)toggleMoreSheet()">
+  <div id="more-sheet-inner">
+    <a onclick="moreSheetGo('faturas')">📄 Faturas</a>
+    <a onclick="moreSheetGo('recibos')">🧾 Recibos</a>
+    <a onclick="moreSheetGo('caixa')">💰 Controle de caixa</a>
+    <a onclick="moreSheetGo('orcamento')">🧮 Calculadora / Orçamento</a>
+  </div>
+</div>
 
 <!-- DASHBOARD -->
 <div class="page active" id="page-dashboard">
@@ -1092,7 +1196,46 @@ function showPage(name){
   if(nv)nv.classList.add('active');
   const renders={dashboard:renderDashboard,agenda:renderAgenda,trabalhos:renderTrabalhos,clientes:renderClientes,financeiro:renderFinanceiro,faturas:renderFaturas,recibos:renderRecibos,caixa:renderCaixa,orcamento:renderPageOrcamento};
   if(renders[name])renders[name]();
+  document.querySelectorAll('#bottom-nav .bn-item').forEach(b=>b.classList.remove('active'));
+  const bn=document.querySelector(`#bottom-nav .bn-item[data-page="${name}"]`);
+  if(bn)bn.classList.add('active');
+  setTimeout(autoLabelTables,50);
 }
+
+// =====================================================
+// MOBILE: bottom nav + more sheet
+// =====================================================
+function bnNavigate(page){ showPage(page); }
+function toggleMoreSheet(){ document.getElementById('more-sheet').classList.toggle('open'); }
+function moreSheetGo(page){ toggleMoreSheet(); showPage(page); }
+
+// =====================================================
+// MOBILE: auto-rotula células das tabelas (Nome: Valor)
+// =====================================================
+function autoLabelTables(){
+  if(window.innerWidth>768)return;
+  document.querySelectorAll('.table-wrap table').forEach(table=>{
+    const ths=[...table.querySelectorAll('thead th')].map(th=>th.textContent.trim());
+    if(!ths.length)return;
+    table.querySelectorAll('tbody tr').forEach(tr=>{
+      if(tr.classList.contains('empty-row'))return;
+      [...tr.children].forEach((td,i)=>{
+        if(ths[i]&&ths[i]!=='Ações'&&!td.querySelector('.badge')&&td.dataset.labeled!=='1'){
+          td.style.display='flex';
+          td.style.justifyContent='space-between';
+          td.style.gap='8px';
+          const label=document.createElement('span');
+          label.style.cssText='color:var(--text3);font-size:11px;font-weight:500;flex-shrink:0';
+          label.textContent=ths[i];
+          if(td.firstChild) td.insertBefore(label,td.firstChild);
+          td.dataset.labeled='1';
+        }
+      });
+    });
+  });
+}
+new MutationObserver(()=>{ if(window.innerWidth<=768) autoLabelTables(); })
+  .observe(document.body,{childList:true,subtree:true});
 
 function openModal(id){populateAllSelects();document.getElementById(id).classList.add('open');}
 function closeModal(id){document.getElementById(id).classList.remove('open');}
