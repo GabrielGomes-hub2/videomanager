@@ -3014,6 +3014,7 @@ function fazerLogin(){
   if(u === LOGIN_USER && p === LOGIN_PASS){
     sessionStorage.setItem(SESSION_KEY, 'ok');
     document.getElementById('login-screen').style.display = 'none';
+    location.reload();
   } else {
     document.getElementById('login-error').style.display = 'block';
     document.getElementById('login-pass').value = '';
