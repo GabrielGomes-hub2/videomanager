@@ -61,24 +61,26 @@ nav a.active svg{opacity:1}
 @media (max-width: 768px){
   body{font-size:15px}
   #sidebar{display:none}
-  #main{margin-left:0;padding-bottom:64px}
-  .page{padding:16px 14px}
+  #main{margin-left:0;padding-bottom:64px;min-width:0}
+  .page{padding:16px 14px;min-width:0}
   .page-header{flex-wrap:wrap;gap:10px}
   .page-title{font-size:17px}
   .page-title small{display:block;margin-left:0;margin-top:2px}
 
   /* stat cards stack 2-col */
   .stats-grid{grid-template-columns:1fr 1fr!important;gap:8px}
-  .stat-card{padding:12px 14px}
-  .stat-card .value{font-size:18px}
+  .stats-grid>*{min-width:0}
+  .stat-card{padding:12px 14px;min-width:0}
+  .stat-card .value{font-size:18px;overflow-wrap:break-word}
 
   /* tables -> cards */
-  .table-wrap table{display:block}
+  .table-wrap{min-width:0}
+  .table-wrap table{display:block;min-width:0}
   .table-wrap thead{display:none}
-  .table-wrap tbody{display:block}
-  .table-wrap tr{display:block;background:var(--bg3);border-radius:var(--radius);margin:0 10px 8px;padding:10px 12px;border-bottom:none!important}
+  .table-wrap tbody{display:block;min-width:0}
+  .table-wrap tr{display:block;background:var(--bg3);border-radius:var(--radius);margin:0 10px 8px;padding:10px 12px;border-bottom:none!important;min-width:0}
   .table-wrap tr.empty-row{background:none;text-align:center;padding:24px 0}
-  .table-wrap td{display:block;padding:3px 0;border-bottom:none;font-size:13px;white-space:normal}
+  .table-wrap td{display:block;padding:3px 0;border-bottom:none;font-size:13px;white-space:normal;min-width:0;overflow-wrap:break-word}
   .table-wrap td:empty{display:none}
   .table-header{padding:12px 14px;flex-wrap:wrap;gap:8px}
 
