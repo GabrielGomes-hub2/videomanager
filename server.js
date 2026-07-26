@@ -71,6 +71,38 @@ app.get('/api/mercadopago/saldo', async (req, res) => {
   }
 });
 
+app.get('/api/mercadopago/pagamentos', async (req, res) => {
+  const token = process.env.MERCADOPAGO_ACCESS_TOKEN;
+  if (!token) {
+    return res.status(500).json({ error: 'MERCADOPAGO_ACCESS_TOKEN não configurado' });
+  }
+
+  const limit = req.query.limit || '30';
+  const offset = req.query.offset || '0';
+
+  const params = new URLSearchParams({
+    sort: 'date_created',
+    criteria: 'desc',
+    limit,
+    offset,
+  });
+
+  try {
+    const mpRes = await fetch(`https://api.mercadopago.com/v1/payments/search?${params}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = await mpRes.json();
+
+    if (!mpRes.ok) {
+      return res.status(mpRes.status).json({ error: 'Erro ao consultar pagamentos', detalhes: data });
+    }
+
+    res.json(data);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
