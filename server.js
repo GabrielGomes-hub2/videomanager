@@ -103,6 +103,52 @@ app.get('/api/mercadopago/pagamentos', async (req, res) => {
   }
 });
 
+app.post('/api/mercadopago/preference', async (req, res) => {
+  const token = process.env.MERCADOPAGO_ACCESS_TOKEN;
+  if (!token) {
+    return res.status(500).json({ error: 'MERCADOPAGO_ACCESS_TOKEN não configurado' });
+  }
+
+  const { titulo, valor, external_reference, payer_email } = req.body;
+
+  if (!titulo || typeof valor !== 'number' || valor <= 0) {
+    return res.status(400).json({ error: 'titulo e valor (número > 0) são obrigatórios' });
+  }
+
+  const body = {
+    items: [
+      {
+        title: titulo,
+        quantity: 1,
+        currency_id: 'BRL',
+        unit_price: valor,
+      },
+    ],
+    external_reference,
+    payer: payer_email ? { email: payer_email } : undefined,
+  };
+
+  try {
+    const mpRes = await fetch('https://api.mercadopago.com/checkout/preferences', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+    const data = await mpRes.json();
+
+    if (!mpRes.ok) {
+      return res.status(mpRes.status).json({ error: 'Erro ao criar preference', detalhes: data });
+    }
+
+    res.json({ id: data.id, init_point: data.init_point });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
