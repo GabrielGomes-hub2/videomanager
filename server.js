@@ -62,11 +62,7 @@ app.get('/api/mercadopago/saldo', async (req, res) => {
     const saldo = await saldoRes.json();
 
     if (!saldoRes.ok) {
-      return res.status(saldoRes.status).json({
-        error: 'Erro ao consultar saldo',
-        detalhes: saldo,
-        debug_conta: { id: me.id, site_id: me.site_id, country_id: me.country_id },
-      });
+      return res.status(saldoRes.status).json({ error: 'Erro ao consultar saldo', detalhes: saldo });
     }
 
     res.json(saldo);
