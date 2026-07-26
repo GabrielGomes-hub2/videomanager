@@ -551,6 +551,25 @@ input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--ac
       <tbody id="financeiro-tbody"></tbody>
     </table>
   </div>
+
+  <div class="page-header" style="margin-top:28px">
+    <div class="page-title" style="font-size:16px">Pagamentos recebidos · Mercado Pago</div>
+  </div>
+  <div class="search-bar">
+    <div class="filters" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <input type="date" id="mp-pag-inicio" style="width:auto">
+      <span style="color:var(--text3);font-size:12px">até</span>
+      <input type="date" id="mp-pag-fim" style="width:auto">
+      <button class="btn btn-primary btn-sm" onclick="buscarPagamentosMP()">Buscar</button>
+    </div>
+  </div>
+  <div class="stats-grid" id="mp-pag-stats"></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Data</th><th>Descrição</th><th>Referência</th><th>Valor</th></tr></thead>
+      <tbody id="mp-pagamentos-tbody"><tr class="empty-row"><td colspan="4">Selecione um período e clique em Buscar</td></tr></tbody>
+    </table>
+  </div>
 </div>
 
 <!-- FATURAS -->
@@ -1910,8 +1929,51 @@ function verCliente(id){
 // =====================================================
 // FINANCEIRO (cobranças avulsas)
 // =====================================================
+function initMpPagDefaults(){
+  const ini=document.getElementById('mp-pag-inicio');
+  const fim=document.getElementById('mp-pag-fim');
+  if(ini&&!ini.value){
+    const hoje=new Date();
+    const inicio=new Date();
+    inicio.setDate(hoje.getDate()-30);
+    fim.value=hoje.toISOString().slice(0,10);
+    ini.value=inicio.toISOString().slice(0,10);
+  }
+}
+
+async function buscarPagamentosMP(){
+  const ini=document.getElementById('mp-pag-inicio').value;
+  const fim=document.getElementById('mp-pag-fim').value;
+  const tbody=document.getElementById('mp-pagamentos-tbody');
+  const stats=document.getElementById('mp-pag-stats');
+  if(!ini||!fim){alert('Selecione as duas datas.');return;}
+  tbody.innerHTML='<tr class="empty-row"><td colspan="4">Buscando...</td></tr>';
+  stats.innerHTML='';
+  try{
+    const params=new URLSearchParams({begin_date:ini,end_date:fim});
+    const res=await fetch('/api/mercadopago/pagamentos?'+params);
+    const data=await res.json();
+    if(!res.ok){tbody.innerHTML=`<tr class="empty-row"><td colspan="4">Erro: ${data.error||'desconhecido'}</td></tr>`;return;}
+    const pags=data.pagamentos||[];
+    if(!pags.length){tbody.innerHTML='<tr class="empty-row"><td colspan="4">Nenhum pagamento recebido no período</td></tr>';return;}
+    tbody.innerHTML=pags.map(p=>`
+      <tr>
+        <td style="font-family:var(--mono);font-size:12px">${fmtDate(p.data)}</td>
+        <td>${p.descricao||'—'}</td>
+        <td style="font-size:12px;color:var(--text3)">${p.referencia||'—'}</td>
+        <td style="font-family:var(--mono);color:var(--green);font-weight:500">${fmtMoney(p.valor)}</td>
+      </tr>
+    `).join('');
+    stats.innerHTML=`
+      <div class="stat-card green"><div class="label">Total recebido no período</div><div class="value">${fmtMoney(data.total)}</div></div>
+      <div class="stat-card accent"><div class="label">Pagamentos encontrados</div><div class="value">${pags.length}</div></div>
+    `;
+  }catch(e){tbody.innerHTML=`<tr class="empty-row"><td colspan="4">Erro: ${e.message}</td></tr>`;}
+}
+
 function renderFinanceiro(){
   populateAllSelects();
+  initMpPagDefaults();
   let cobs=DB.get('cobrancas');
   const q=(document.getElementById('search-fin').value||'').toLowerCase();
   const fs=document.getElementById('filter-fin-status').value;

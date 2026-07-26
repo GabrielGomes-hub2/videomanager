@@ -77,15 +77,23 @@ app.get('/api/mercadopago/pagamentos', async (req, res) => {
     return res.status(500).json({ error: 'MERCADOPAGO_ACCESS_TOKEN não configurado' });
   }
 
-  const limit = req.query.limit || '30';
+  const { begin_date, end_date } = req.query;
+  const limit = req.query.limit || '100';
   const offset = req.query.offset || '0';
+  const status = req.query.status || 'approved';
 
   const params = new URLSearchParams({
-    sort: 'date_created',
+    sort: 'date_approved',
     criteria: 'desc',
+    status,
     limit,
     offset,
   });
+  if (begin_date && end_date) {
+    params.set('range', 'date_approved');
+    params.set('begin_date', `${begin_date}T00:00:00.000-03:00`);
+    params.set('end_date', `${end_date}T23:59:59.999-03:00`);
+  }
 
   try {
     const mpRes = await fetch(`https://api.mercadopago.com/v1/payments/search?${params}`, {
@@ -97,7 +105,16 @@ app.get('/api/mercadopago/pagamentos', async (req, res) => {
       return res.status(mpRes.status).json({ error: 'Erro ao consultar pagamentos', detalhes: data });
     }
 
-    res.json(data);
+    const pagamentos = (data.results || []).map((p) => ({
+      id: p.id,
+      data: p.date_approved || p.date_created,
+      descricao: p.description || '',
+      referencia: p.external_reference || '',
+      valor: p.transaction_amount,
+    }));
+    const total = pagamentos.reduce((s, p) => s + Number(p.valor || 0), 0);
+
+    res.json({ pagamentos, total, paging: data.paging });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
