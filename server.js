@@ -46,16 +46,26 @@ app.get('/api/mercadopago/saldo', async (req, res) => {
   }
 
   try {
-    const mpRes = await fetch('https://api.mercadopago.com/v1/account/balance', {
+    const meRes = await fetch('https://api.mercadopago.com/users/me', {
       headers: { Authorization: `Bearer ${token}` },
     });
-    const data = await mpRes.json();
+    const me = await meRes.json();
 
-    if (!mpRes.ok) {
-      return res.status(mpRes.status).json({ error: 'Erro ao consultar saldo', detalhes: data });
+    if (!meRes.ok) {
+      return res.status(meRes.status).json({ error: 'Erro ao identificar conta', detalhes: me });
     }
 
-    res.json(data);
+    const saldoRes = await fetch(
+      `https://api.mercadopago.com/users/${me.id}/mercadopago_account/balance`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    const saldo = await saldoRes.json();
+
+    if (!saldoRes.ok) {
+      return res.status(saldoRes.status).json({ error: 'Erro ao consultar saldo', detalhes: saldo });
+    }
+
+    res.json(saldo);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
