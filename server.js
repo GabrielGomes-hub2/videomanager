@@ -137,11 +137,26 @@ app.post('/api/mercadopago/preference', async (req, res) => {
     return res.status(500).json({ error: 'MERCADOPAGO_ACCESS_TOKEN não configurado' });
   }
 
-  const { titulo, valor, external_reference, payer_email } = req.body;
+  const {
+    titulo,
+    valor,
+    external_reference,
+    payer_email,
+    permitir_pix = true,
+    permitir_cartao = true,
+    permitir_boleto = true,
+    parcelas_max = 12,
+    validade_dias,
+  } = req.body;
 
   if (!titulo || typeof valor !== 'number' || valor <= 0) {
     return res.status(400).json({ error: 'titulo e valor (número > 0) são obrigatórios' });
   }
+
+  const excluded_payment_types = [];
+  if (!permitir_pix) excluded_payment_types.push({ id: 'bank_transfer' });
+  if (!permitir_cartao) excluded_payment_types.push({ id: 'credit_card' }, { id: 'debit_card' });
+  if (!permitir_boleto) excluded_payment_types.push({ id: 'ticket' });
 
   const body = {
     items: [
@@ -154,7 +169,19 @@ app.post('/api/mercadopago/preference', async (req, res) => {
     ],
     external_reference,
     payer: payer_email ? { email: payer_email } : undefined,
+    payment_methods: {
+      excluded_payment_types,
+      installments: permitir_cartao ? Number(parcelas_max) || 1 : 1,
+    },
   };
+
+  if (validade_dias) {
+    const now = new Date();
+    const until = new Date(now.getTime() + Number(validade_dias) * 24 * 60 * 60 * 1000);
+    body.expires = true;
+    body.expiration_date_from = now.toISOString();
+    body.expiration_date_to = until.toISOString();
+  }
 
   try {
     const mpRes = await fetch('https://api.mercadopago.com/checkout/preferences', {

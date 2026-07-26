@@ -915,6 +915,52 @@ input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--ac
   </div>
 </div>
 
+<!-- MODAL GERAR COBRANÇA MERCADO PAGO -->
+<div class="modal-overlay" id="modal-mp-cobranca">
+  <div class="modal">
+    <div class="modal-header"><h3>Gerar cobrança — Mercado Pago</h3><button class="close-btn" onclick="closeModal('modal-mp-cobranca')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+    <div class="modal-body">
+      <input type="hidden" id="mpc-tipo">
+      <input type="hidden" id="mpc-ref-id">
+      <div class="form-group"><label>Título *</label><input type="text" id="mpc-titulo"></div>
+      <div class="form-row">
+        <div class="form-group"><label>Valor (R$) *</label><input type="number" step="0.01" id="mpc-valor"></div>
+        <div class="form-group"><label>E-mail do cliente</label><input type="email" id="mpc-email" placeholder="opcional"></div>
+      </div>
+      <div class="form-group">
+        <label>Formas de pagamento permitidas</label>
+        <div style="display:flex;gap:16px;flex-wrap:wrap;padding:8px 0">
+          <label style="display:flex;align-items:center;gap:6px;font-weight:400"><input type="checkbox" id="mpc-pix" checked> Pix</label>
+          <label style="display:flex;align-items:center;gap:6px;font-weight:400"><input type="checkbox" id="mpc-cartao" checked onchange="toggleMpParcelas()"> Cartão</label>
+          <label style="display:flex;align-items:center;gap:6px;font-weight:400"><input type="checkbox" id="mpc-boleto" checked> Boleto</label>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group" id="mpc-parcelas-wrap"><label>Parcelas máximas no cartão</label>
+          <select id="mpc-parcelas">
+            <option value="1">1x (à vista)</option>
+            <option value="2">2x</option>
+            <option value="3">3x</option>
+            <option value="6">6x</option>
+            <option value="12" selected>12x</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Validade do link</label>
+          <select id="mpc-validade">
+            <option value="">Sem expiração</option>
+            <option value="1">1 dia</option>
+            <option value="3" selected>3 dias</option>
+            <option value="7">7 dias</option>
+            <option value="15">15 dias</option>
+            <option value="30">30 dias</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-ghost" onclick="closeModal('modal-mp-cobranca')">Cancelar</button><button class="btn btn-primary" onclick="confirmarGerarCobrancaMP()">Gerar link</button></div>
+  </div>
+</div>
+
 <!-- MODAL FATURA -->
 <div class="modal-overlay" id="modal-fatura">
   <div class="modal" style="width:640px">
@@ -1673,6 +1719,7 @@ function renderTrabalhos(){
       <td>
         <div style="display:flex;gap:4px;flex-wrap:wrap">
           <button class="btn btn-ghost btn-sm" onclick="editTrabalho('${t.id}')">Editar</button>
+          ${t.situacao==='nao_pago'?`<button class="btn btn-ghost btn-sm" onclick="gerarCobrancaTrabalho('${t.id}')">💳 Cobrar</button>`:''}
           ${t.situacao!=='em_fatura'?`<button class="btn btn-ghost btn-sm" onclick="gerarReciboDeTrabalho('${t.id}')">Recibo</button>`:''}
           <button class="btn btn-danger btn-sm" onclick="delTrabalho('${t.id}')">×</button>
         </div>
@@ -2338,24 +2385,81 @@ function abrirReciboFatura(fid){
   openModal('modal-recibo');
 }
 
-async function gerarLinkPagamentoFatura(id){
+function gerarLinkPagamentoFatura(id){
   const f=DB.get('faturas').find(x=>x.id===id);if(!f)return;
   const c=DB.get('clientes').find(x=>x.id===f.clienteId)||{};
   const tot=(f.itens||[]).reduce((s,i)=>s+Number(i.valor||0),0);
   if(tot<=0){alert('Fatura sem valor.');return;}
+  abrirModalMpCobranca({
+    tipo:'fatura',
+    refId:f.id,
+    titulo:`${f.desc||'Fatura'}${c.nome?' - '+c.nome:''}`,
+    valor:tot,
+    email:c.email
+  });
+}
+
+function gerarCobrancaTrabalho(id){
+  const t=DB.get('trabalhos').find(x=>x.id===id);if(!t)return;
+  const c=DB.get('clientes').find(x=>x.id===t.clienteId)||{};
+  const saldo=Number(t.valor||0)-Number(t.valorPago||0);
+  if(saldo<=0){alert('Trabalho sem saldo a cobrar.');return;}
+  abrirModalMpCobranca({
+    tipo:'trabalho',
+    refId:t.id,
+    titulo:`${t.titulo}${c.nome?' - '+c.nome:''}`,
+    valor:saldo,
+    email:c.email
+  });
+}
+
+function abrirModalMpCobranca({tipo,refId,titulo,valor,email}){
+  document.getElementById('mpc-tipo').value=tipo;
+  document.getElementById('mpc-ref-id').value=refId;
+  document.getElementById('mpc-titulo').value=titulo||'';
+  document.getElementById('mpc-valor').value=valor||'';
+  document.getElementById('mpc-email').value=email||'';
+  document.getElementById('mpc-pix').checked=true;
+  document.getElementById('mpc-cartao').checked=true;
+  document.getElementById('mpc-boleto').checked=true;
+  document.getElementById('mpc-parcelas').value='12';
+  document.getElementById('mpc-validade').value='3';
+  toggleMpParcelas();
+  openModal('modal-mp-cobranca');
+}
+
+function toggleMpParcelas(){
+  const cartao=document.getElementById('mpc-cartao').checked;
+  document.getElementById('mpc-parcelas-wrap').style.display=cartao?'block':'none';
+}
+
+async function confirmarGerarCobrancaMP(){
+  const titulo=document.getElementById('mpc-titulo').value.trim();
+  const valor=parseFloat(document.getElementById('mpc-valor').value)||0;
+  const email=document.getElementById('mpc-email').value.trim();
+  const refId=document.getElementById('mpc-ref-id').value;
+  const permitir_pix=document.getElementById('mpc-pix').checked;
+  const permitir_cartao=document.getElementById('mpc-cartao').checked;
+  const permitir_boleto=document.getElementById('mpc-boleto').checked;
+  const parcelas_max=parseInt(document.getElementById('mpc-parcelas').value)||1;
+  const validadeSel=document.getElementById('mpc-validade').value;
+
+  if(!titulo||valor<=0){alert('Preencha título e valor.');return;}
+  if(!permitir_pix&&!permitir_cartao&&!permitir_boleto){alert('Selecione ao menos uma forma de pagamento.');return;}
+
   try{
     const res=await fetch('/api/mercadopago/preference',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
-        titulo:`${f.desc||'Fatura'}${c.nome?' - '+c.nome:''}`,
-        valor:tot,
-        external_reference:f.id,
-        payer_email:c.email||undefined
+        titulo,valor,external_reference:refId,payer_email:email||undefined,
+        permitir_pix,permitir_cartao,permitir_boleto,parcelas_max,
+        validade_dias:validadeSel?Number(validadeSel):undefined
       })
     });
     const data=await res.json();
     if(!res.ok){alert('Erro ao gerar link de pagamento: '+(data.error||'desconhecido'));return;}
+    closeModal('modal-mp-cobranca');
     prompt('Link de pagamento gerado (copie abaixo):',data.init_point);
   }catch(e){alert('Erro ao gerar link de pagamento: '+e.message);}
 }
