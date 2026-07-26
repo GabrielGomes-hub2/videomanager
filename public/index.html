@@ -2174,6 +2174,7 @@ function renderFaturas(){
       <div style="display:flex;gap:6px;flex-wrap:wrap">
         <button class="btn btn-ghost btn-sm" onclick="editFatura('${f.id}')">Editar</button>
         ${f.status!=='paga'?`<button class="btn btn-success btn-sm" onclick="marcarFaturaPaga('${f.id}')">✓ Marcar como paga</button>`:''}
+        <button class="btn btn-ghost btn-sm" onclick="gerarLinkPagamentoFatura('${f.id}')">💳 Link de pagamento</button>
         <button class="btn btn-ghost btn-sm" onclick="abrirReciboFatura('${f.id}')">Gerar recibo</button>
         <button class="btn btn-ghost btn-sm" onclick="imprimirFatura('${f.id}')">Imprimir</button>
         <button class="btn btn-danger btn-sm" onclick="delFatura('${f.id}')">Excluir</button>
@@ -2273,6 +2274,28 @@ function abrirReciboFatura(fid){
   document.getElementById('rec-pgto').value=f.dataPgto||'';
   document.getElementById('rec-periodo').value=f.periodo||'';
   openModal('modal-recibo');
+}
+
+async function gerarLinkPagamentoFatura(id){
+  const f=DB.get('faturas').find(x=>x.id===id);if(!f)return;
+  const c=DB.get('clientes').find(x=>x.id===f.clienteId)||{};
+  const tot=(f.itens||[]).reduce((s,i)=>s+Number(i.valor||0),0);
+  if(tot<=0){alert('Fatura sem valor.');return;}
+  try{
+    const res=await fetch('/api/mercadopago/preference',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        titulo:`${f.desc||'Fatura'}${c.nome?' - '+c.nome:''}`,
+        valor:tot,
+        external_reference:f.id,
+        payer_email:c.email||undefined
+      })
+    });
+    const data=await res.json();
+    if(!res.ok){alert('Erro ao gerar link de pagamento: '+(data.error||'desconhecido'));return;}
+    prompt('Link de pagamento gerado (copie abaixo):',data.init_point);
+  }catch(e){alert('Erro ao gerar link de pagamento: '+e.message);}
 }
 
 function imprimirFatura(id){
