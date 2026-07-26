@@ -204,6 +204,64 @@ app.post('/api/mercadopago/preference', async (req, res) => {
   }
 });
 
+app.post('/api/mercadopago/gerar-boleto', async (req, res) => {
+  const token = process.env.MERCADOPAGO_ACCESS_TOKEN;
+  if (!token) {
+    return res.status(500).json({ error: 'MERCADOPAGO_ACCESS_TOKEN não configurado' });
+  }
+
+  const { valor, descricao, nome, cpf, email, external_reference } = req.body;
+
+  if (typeof valor !== 'number' || valor <= 0) {
+    return res.status(400).json({ error: 'valor (número > 0) é obrigatório' });
+  }
+  if (!descricao || !nome || !cpf || !email) {
+    return res.status(400).json({ error: 'descricao, nome, cpf e email são obrigatórios' });
+  }
+
+  const cpfLimpo = String(cpf).replace(/\D/g, '');
+  const [first_name, ...resto] = String(nome).trim().split(/\s+/);
+  const last_name = resto.join(' ') || first_name;
+
+  const body = {
+    payment_method_id: 'bolbradesco',
+    transaction_amount: valor,
+    description: descricao,
+    external_reference,
+    payer: {
+      first_name,
+      last_name,
+      email,
+      identification: { type: 'CPF', number: cpfLimpo },
+    },
+  };
+
+  try {
+    const mpRes = await fetch('https://api.mercadopago.com/v1/payments', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'X-Idempotency-Key': require('crypto').randomUUID(),
+      },
+      body: JSON.stringify(body),
+    });
+    const data = await mpRes.json();
+
+    if (!mpRes.ok) {
+      return res.status(mpRes.status).json({ error: 'Erro ao gerar boleto', detalhes: data });
+    }
+
+    res.json({
+      id: data.id,
+      link_boleto: data.transaction_details?.external_resource_url,
+      codigo_barras: data.barcode?.content,
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
