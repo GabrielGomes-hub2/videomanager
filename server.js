@@ -96,6 +96,17 @@ app.get('/api/mercadopago/pagamentos', async (req, res) => {
   }
 
   try {
+    const meRes = await fetch('https://api.mercadopago.com/users/me', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const me = await meRes.json();
+
+    if (!meRes.ok) {
+      return res.status(meRes.status).json({ error: 'Erro ao identificar conta', detalhes: me });
+    }
+
+    params.set('collector.id', me.id);
+
     const mpRes = await fetch(`https://api.mercadopago.com/v1/payments/search?${params}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
