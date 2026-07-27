@@ -553,6 +553,16 @@ input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--ac
   </div>
 
   <div class="page-header" style="margin-top:28px">
+    <div class="page-title" style="font-size:16px">Boletos gerados · Mercado Pago</div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Data</th><th>Cliente / Descrição</th><th>Valor</th><th>Vencimento</th><th>Status</th><th>Ações</th></tr></thead>
+      <tbody id="boletos-tbody"></tbody>
+    </table>
+  </div>
+
+  <div class="page-header" style="margin-top:28px">
     <div class="page-title" style="font-size:16px">Pagamentos recebidos · Mercado Pago</div>
   </div>
   <div class="search-bar">
@@ -922,6 +932,7 @@ input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--ac
     <div class="modal-body">
       <input type="hidden" id="mpc-tipo">
       <input type="hidden" id="mpc-ref-id">
+      <input type="hidden" id="mpc-nome">
       <div class="form-group"><label>Título *</label><input type="text" id="mpc-titulo"></div>
       <div class="form-row">
         <div class="form-group"><label>Valor (R$) *</label><input type="number" step="0.01" id="mpc-valor"></div>
@@ -956,8 +967,15 @@ input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--ac
           </select>
         </div>
       </div>
+      <hr class="p-divider" style="margin:14px 0">
+      <div class="form-group"><label style="font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:.04em">Gerar boleto real (bolbradesco)</label></div>
+      <div class="form-row">
+        <div class="form-group"><label>CPF/CNPJ do pagador *</label><input type="text" id="mpc-doc" placeholder="Só números"></div>
+        <div class="form-group"><label>Vencimento do boleto</label><input type="date" id="mpc-venc"></div>
+      </div>
     </div>
-    <div class="modal-footer"><button class="btn btn-ghost" onclick="closeModal('modal-mp-cobranca')">Cancelar</button><button class="btn btn-primary" onclick="confirmarGerarCobrancaMP()">Gerar link</button></div>
+    <div class="modal-footer"><button class="btn btn-ghost" onclick="closeModal('modal-mp-cobranca')">Cancelar</button><button class="btn btn-success" onclick="confirmarGerarBoletoMP()">Gerar boleto (PDF)</button><button class="btn btn-primary" onclick="confirmarGerarCobrancaMP()">Gerar link</button></div>
+
   </div>
 </div>
 
@@ -2075,6 +2093,29 @@ function renderFinanceiro(){
       </td>
     </tr>
   `).join(''):'<tr class="empty-row"><td colspan="8">Nenhuma cobrança avulsa</td></tr>';
+
+  renderBoletos();
+}
+
+function renderBoletos(){
+  const tb=document.getElementById('boletos-tbody');
+  if(!tb)return;
+  const boletos=[...DB.get('boletos')].reverse();
+  tb.innerHTML=boletos.length?boletos.map(b=>`
+    <tr>
+      <td style="font-size:12px;color:var(--text3);font-family:var(--mono)">${fmtDate(b.criadoEm)}</td>
+      <td>${b.nome||'—'}${b.descricao?`<div style="font-size:12px;color:var(--text2)">${b.descricao}</div>`:''}</td>
+      <td style="font-family:var(--mono);font-weight:500;color:var(--green)">${fmtMoney(b.valor)}</td>
+      <td>${b.vencimento?fmtDate(b.vencimento):'—'}</td>
+      <td><span class="badge badge-gray">${b.status||'—'}</span></td>
+      <td>
+        <div style="display:flex;gap:4px">
+          <button class="btn btn-ghost btn-sm" onclick="imprimirBoleto('${b.id}')">PDF</button>
+          ${b.linkBoleto?`<button class="btn btn-ghost btn-sm" onclick="window.open('${b.linkBoleto}','_blank')">Abrir MP</button>`:''}
+        </div>
+      </td>
+    </tr>
+  `).join(''):'<tr class="empty-row"><td colspan="6">Nenhum boleto gerado</td></tr>';
 }
 
 function saveCobranca(){
@@ -2395,7 +2436,10 @@ function gerarLinkPagamentoFatura(id){
     refId:f.id,
     titulo:`${f.desc||'Fatura'}${c.nome?' - '+c.nome:''}`,
     valor:tot,
-    email:c.email
+    email:c.email,
+    nome:c.nome,
+    doc:c.doc,
+    venc:f.venc
   });
 }
 
@@ -2409,16 +2453,21 @@ function gerarCobrancaTrabalho(id){
     refId:t.id,
     titulo:`${t.titulo}${c.nome?' - '+c.nome:''}`,
     valor:saldo,
-    email:c.email
+    email:c.email,
+    nome:c.nome,
+    doc:c.doc
   });
 }
 
-function abrirModalMpCobranca({tipo,refId,titulo,valor,email}){
+function abrirModalMpCobranca({tipo,refId,titulo,valor,email,nome,doc,venc}){
   document.getElementById('mpc-tipo').value=tipo;
   document.getElementById('mpc-ref-id').value=refId;
+  document.getElementById('mpc-nome').value=nome||'';
   document.getElementById('mpc-titulo').value=titulo||'';
   document.getElementById('mpc-valor').value=valor||'';
   document.getElementById('mpc-email').value=email||'';
+  document.getElementById('mpc-doc').value=doc||'';
+  document.getElementById('mpc-venc').value=venc||'';
   document.getElementById('mpc-pix').checked=true;
   document.getElementById('mpc-cartao').checked=true;
   document.getElementById('mpc-boleto').checked=true;
@@ -2462,6 +2511,98 @@ async function confirmarGerarCobrancaMP(){
     closeModal('modal-mp-cobranca');
     prompt('Link de pagamento gerado (copie abaixo):',data.init_point);
   }catch(e){alert('Erro ao gerar link de pagamento: '+e.message);}
+}
+
+async function confirmarGerarBoletoMP(){
+  const tipo=document.getElementById('mpc-tipo').value;
+  const refId=document.getElementById('mpc-ref-id').value;
+  const nome=document.getElementById('mpc-nome').value.trim();
+  const titulo=document.getElementById('mpc-titulo').value.trim();
+  const valor=parseFloat(document.getElementById('mpc-valor').value)||0;
+  const email=document.getElementById('mpc-email').value.trim();
+  const doc=document.getElementById('mpc-doc').value.trim();
+  const venc=document.getElementById('mpc-venc').value;
+  const docLimpo=doc.replace(/\D/g,'');
+
+  if(!titulo||valor<=0){alert('Preencha título e valor.');return;}
+  if(!nome){alert('Não foi possível identificar o nome do cliente/pagador.');return;}
+  if(docLimpo.length!==11&&docLimpo.length!==14){alert('Informe um CPF (11 dígitos) ou CNPJ (14 dígitos) válido.');return;}
+  if(!email){alert('E-mail do cliente é obrigatório para gerar boleto.');return;}
+
+  try{
+    const res=await fetch('/api/mercadopago/gerar-boleto',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        valor,descricao:titulo,nome,cpf:docLimpo,email,
+        external_reference:refId,data_vencimento:venc||undefined
+      })
+    });
+    const data=await res.json();
+    if(!res.ok){alert('Erro ao gerar boleto: '+(data.error||'desconhecido'));return;}
+
+    const boletos=DB.get('boletos');
+    const novo={
+      id:uid(),tipo,refId,criadoEm:today(),valor,descricao:titulo,
+      nome,doc:docLimpo,email,vencimento:venc||null,
+      mpPaymentId:data.id,linkBoleto:data.link_boleto,codigoBarras:data.codigo_barras,
+      status:data.status
+    };
+    boletos.push(novo);
+    DB.set('boletos',boletos);
+
+    closeModal('modal-mp-cobranca');
+    renderFinanceiro();
+    imprimirBoleto(novo.id);
+  }catch(e){alert('Erro ao gerar boleto: '+e.message);}
+}
+
+function imprimirBoleto(id){
+  const boletos=DB.get('boletos');
+  const b=boletos.find(x=>x.id===id);if(!b)return;
+  const num=boletos.findIndex(x=>x.id===id)+1;
+  const logoSrc=LOGO_PRINT;
+  const barrasFmt=(b.codigoBarras||'').replace(/(\d{5})(?=\d)/g,'$1 ');
+  document.getElementById('print-area').innerHTML=`
+    <div class="p-header">
+      ${logoSrc?`<img src="${logoSrc}" alt="Logo" style="height:43px;max-width:192px;object-fit:contain">`:'<div style="font-size:18px;font-weight:800">Gabriel Gomes<br><span style="font-size:12px;font-weight:400;letter-spacing:2px;text-transform:uppercase">Videomaker</span></div>'}
+      <div class="p-header-right">
+        <div class="p-doc-type">Boleto</div>
+        <div class="p-doc-num">Nº ${String(num).padStart(4,'0')}</div>
+      </div>
+    </div>
+    <hr class="p-divider">
+
+    <div class="p-dates">
+      <div class="p-date-box">
+        <div class="pdl">Data de emissão</div>
+        <div class="pdv">${fmtDate(b.criadoEm)}</div>
+      </div>
+      ${b.vencimento?`<div class="p-date-box"><div class="pdl">Vencimento</div><div class="pdv">${fmtDate(b.vencimento)}</div></div>`:''}
+    </div>
+
+    <div class="p-section">
+      <div class="p-section-label">Pagador</div>
+      <div class="p-cliente-nome">${b.nome||'—'}</div>
+      <div class="p-cliente-doc">CPF/CNPJ: ${b.doc||'—'}</div>
+      ${b.email?`<div class="p-cliente-extra">${b.email}</div>`:''}
+    </div>
+
+    <div class="p-section">
+      <div class="p-section-label">Valor</div>
+      <div class="p-pgto-row"><span class="p-pgto-label">Descrição</span><span class="p-pgto-val">${b.descricao||'—'}</span></div>
+      <div class="p-pgto-row"><span class="p-pgto-label">Valor do boleto</span><span class="p-pgto-val">${fmtMoney(b.valor)}</span></div>
+      ${b.status?`<div class="p-pgto-row"><span class="p-pgto-label">Status (Mercado Pago)</span><span class="p-pgto-val">${b.status}</span></div>`:''}
+    </div>
+
+    <div class="p-section">
+      <div class="p-section-label">Código de barras</div>
+      <div style="font-family:var(--mono,monospace);font-size:13px;letter-spacing:1px;word-break:break-all">${barrasFmt||'—'}</div>
+      <div style="font-size:11px;color:#555;margin-top:4px">Copie e cole (ou digite) no app do seu banco para pagar.</div>
+      ${b.linkBoleto?`<div style="margin-top:10px"><a href="${b.linkBoleto}" target="_blank" rel="noopener">Abrir boleto oficial no Mercado Pago (com código de barras escaneável)</a></div>`:''}
+    </div>
+  `;
+  window.print();
 }
 
 function imprimirFatura(id){

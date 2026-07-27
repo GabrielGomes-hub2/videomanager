@@ -210,7 +210,7 @@ app.post('/api/mercadopago/gerar-boleto', async (req, res) => {
     return res.status(500).json({ error: 'MERCADOPAGO_ACCESS_TOKEN não configurado' });
   }
 
-  const { valor, descricao, nome, cpf, email, external_reference } = req.body;
+  const { valor, descricao, nome, cpf, email, external_reference, data_vencimento } = req.body;
 
   if (typeof valor !== 'number' || valor <= 0) {
     return res.status(400).json({ error: 'valor (número > 0) é obrigatório' });
@@ -232,9 +232,13 @@ app.post('/api/mercadopago/gerar-boleto', async (req, res) => {
       first_name,
       last_name,
       email,
-      identification: { type: 'CPF', number: cpfLimpo },
+      identification: { type: cpfLimpo.length === 14 ? 'CNPJ' : 'CPF', number: cpfLimpo },
     },
   };
+
+  if (data_vencimento) {
+    body.date_of_expiration = `${data_vencimento}T23:59:59.000-03:00`;
+  }
 
   try {
     const mpRes = await fetch('https://api.mercadopago.com/v1/payments', {
@@ -256,6 +260,8 @@ app.post('/api/mercadopago/gerar-boleto', async (req, res) => {
       id: data.id,
       link_boleto: data.transaction_details?.external_resource_url,
       codigo_barras: data.barcode?.content,
+      status: data.status,
+      date_of_expiration: data.date_of_expiration,
     });
   } catch (e) {
     res.status(500).json({ error: e.message });
