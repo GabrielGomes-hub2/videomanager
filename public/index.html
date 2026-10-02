@@ -2276,11 +2276,18 @@ function saveFatura(){
   if(id){const i=fats.findIndex(f=>f.id===id);fats[i]=obj;}else fats.push(obj);
   DB.set('faturas',fats);
 
-  // marcar trabalhos selecionados como "em_fatura"
+  // sincronizar situação dos trabalhos vinculados conforme o status da fatura
   const trabs=DB.get('trabalhos');
   trabItens.forEach(item=>{
     const t=trabs.find(x=>x.id===item.trabId);
-    if(t&&t.situacao==='nao_pago'){t.situacao='em_fatura';t.valor=item.valor;}
+    if(!t)return;
+    if(obj.status==='paga'){
+      t.situacao='pago';t.valorPago=item.valor;
+    }else if(obj.status==='cancelada'){
+      if(t.situacao==='em_fatura')t.situacao='nao_pago';
+    }else if(t.situacao==='nao_pago'||t.situacao==='pago'){
+      t.situacao='em_fatura';t.valor=item.valor;
+    }
   });
   DB.set('trabalhos',trabs);
 
