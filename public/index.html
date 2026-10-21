@@ -58,7 +58,7 @@ nav a.active svg{opacity:1}
 #more-sheet{display:none}
 
 /* ===== MOBILE RESPONSIVE ===== */
-@media (max-width: 768px){
+@media screen and (max-width: 768px){
   body{font-size:15px}
   #sidebar{display:none}
   #main{margin-left:0;padding-bottom:64px;min-width:0}
@@ -256,7 +256,7 @@ input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--ac
   .modal-overlay{display:none!important}
   body{background:#fff;color:#000;margin:0;padding:0;display:block;font-family:'Helvetica Neue',Arial,sans-serif}
   html,body{height:auto!important;overflow:visible!important}
-  #print-area{display:block!important;padding:56px 60px;max-width:680px;margin:0 auto;color:#000}
+  #print-area{display:block!important;padding:56px 60px;width:680px;max-width:none;margin:0 auto;color:#000}
 
   /* HEADER */
   .p-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px}
@@ -2564,6 +2564,21 @@ async function confirmarGerarBoletoMP(){
   }catch(e){alert('Erro ao gerar boleto: '+e.message);}
 }
 
+// No celular o navegador monta a impressão na largura da tela (≈400px).
+// Força temporariamente a viewport na largura de uma A4 (794px) para a
+// folha sair igual à do computador, e restaura depois de imprimir.
+function imprimirA4(){
+  const vp=document.querySelector('meta[name=viewport]');
+  const original=vp.getAttribute('content');
+  const restaurar=()=>{
+    vp.setAttribute('content',original);
+    window.removeEventListener('afterprint',restaurar);
+  };
+  vp.setAttribute('content','width=794');
+  window.addEventListener('afterprint',restaurar);
+  setTimeout(()=>window.print(),300);
+}
+
 function imprimirBoleto(id){
   const boletos=DB.get('boletos');
   const b=boletos.find(x=>x.id===id);if(!b)return;
@@ -2609,7 +2624,7 @@ function imprimirBoleto(id){
       ${b.linkBoleto?`<div style="margin-top:10px"><a href="${b.linkBoleto}" target="_blank" rel="noopener">Abrir boleto oficial no Mercado Pago (com código de barras escaneável)</a></div>`:''}
     </div>
   `;
-  window.print();
+  imprimirA4();
 }
 
 function imprimirFatura(id){
@@ -2675,7 +2690,7 @@ function imprimirFatura(id){
       <div class="p-sign">Assinatura do cliente<strong>${c.nome||''}</strong></div>
     </div>
   `;
-  window.print();
+  imprimirA4();
 }
 
 function resetFatura(){
@@ -2839,7 +2854,7 @@ function imprimirRecibo(id){
       <div class="p-sign">Assinatura do cliente<strong>${c.nome||''}</strong></div>
     </div>
   `;
-  window.print();
+  imprimirA4();
 }
 
 // =====================================================
@@ -2892,7 +2907,7 @@ function imprimirAgenda(){
     </table>
     <div style="margin-top:24px;font-size:11px;color:#aaa;text-align:right">${agendas.length} compromisso(s) · ${agendas.filter(a=>a.status==='captado').length} já captado(s)</div>
   `;
-  window.print();
+  imprimirA4();
 }
 
 // =====================================================
@@ -3280,7 +3295,7 @@ function _imprimirOrcObj(o){
       Orçamento válido até ${fmtDate(o.validade)}. Gabriel Gomes Videomaker.
     </div>
   `;
-  window.print();
+  imprimirA4();
 }
 
 function imprimirPacotes(){
@@ -3332,7 +3347,7 @@ function imprimirPacotes(){
     </div>`:''}
     ${validade?`<div style="font-size:11px;color:#bbb;text-align:center;border-top:1px solid #eee;padding-top:12px">Proposta válida até ${fmtDate(validade)}. Gabriel Gomes Videomaker.</div>`:''}
   `;
-  window.print();
+  imprimirA4();
 }
 
 function renderOrcSalvos(){
