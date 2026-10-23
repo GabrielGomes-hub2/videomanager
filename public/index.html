@@ -3485,7 +3485,7 @@ const LOGIN_PASS = '130416';
 const SESSION_KEY = 'vm_auth';
 
 function verificarLogin(){
-  const auth = sessionStorage.getItem(SESSION_KEY);
+  const auth = localStorage.getItem(SESSION_KEY);
   if(auth === 'ok'){
     document.getElementById('login-screen').style.display = 'none';
     return true;
@@ -3506,7 +3506,7 @@ function fazerLogin(){
   const u = document.getElementById('login-user').value.trim().toLowerCase();
   const p = document.getElementById('login-pass').value;
   if(u === LOGIN_USER && p === LOGIN_PASS){
-    sessionStorage.setItem(SESSION_KEY, 'ok');
+    localStorage.setItem(SESSION_KEY, 'ok');
     document.getElementById('login-screen').style.display = 'none';
     location.reload();
   } else {
