@@ -313,6 +313,27 @@ input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--ac
   .p-media-verde .pmv{color:#0a7a3d}
   .p-media-dest{border:1.5px solid #0a7a3d;background:#eef8f1}
   .p-media-dest .pml,.p-media-dest .pmv,.p-media-dest .pms{color:#0a7a3d}
+  #print-area:has(.p-fatura){padding:30px 44px;width:706px}
+  .p-fatura .p-divider{margin:8px 0 12px}
+  .p-fatura .p-doc-num{font-size:20px}
+  .pf-topo{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;margin-bottom:14px}
+  .pf-meta{display:grid;grid-template-columns:auto auto;gap:3px 12px;font-size:11px;text-align:right;white-space:nowrap}
+  .pf-meta div{display:contents}
+  .pf-meta span{color:#888;text-transform:uppercase;font-size:8.5px;letter-spacing:.8px;font-weight:700;align-self:center}
+  .pf-meta strong{color:#111;font-size:12px}
+  .p-fatura .p-section{margin-bottom:10px}
+  .p-fatura .p-items-table td{padding:5px 8px;font-size:12px}
+  .p-fatura .p-items-table th{padding:4px 8px}
+  .p-fatura .p-items-table .p-item-obs{font-size:10.5px;margin-top:2px;line-height:1.35}
+  .p-fatura .p-resumo-row{padding:3px 8px}
+  .p-fatura .p-resumo-total{padding-top:7px;font-size:16px}
+  .p-fatura .p-medias{margin:8px 0 2px}
+  .p-fatura .p-media-box{padding:6px 10px}
+  .p-fatura .p-resumo-nota{margin:6px 8px 2px;padding:6px 12px}
+  .p-fatura .p-extenso{padding:2px 8px 4px}
+  .pf-pgto{display:flex;gap:22px;flex-wrap:wrap;font-size:11px;color:#777;border-top:1px solid #eee;border-bottom:1px solid #eee;padding:6px 0}
+  .pf-pgto strong{color:#111}
+  .p-fatura .p-signs{margin-top:34px}
   .p-resumo-nota{margin:8px 8px 4px;padding:9px 12px;background:#eef8f1;border-left:3px solid #0a7a3d;font-size:11.5px;color:#1c4a2e}
 
   /* PAGAMENTO */
@@ -2721,7 +2742,7 @@ function imprimirBoleto(id){
     <div class="p-section">
       <div class="p-section-label">Pagador</div>
       <div class="p-cliente-nome">${b.nome||'—'}</div>
-      <div class="p-cliente-doc">CPF/CNPJ: ${b.doc||'—'}</div>
+      ${b.doc?`<div class="p-cliente-doc">CPF/CNPJ: ${b.doc}</div>`:''}
       ${b.email?`<div class="p-cliente-extra">${b.email}</div>`:''}
     </div>
 
@@ -2740,6 +2761,30 @@ function imprimirBoleto(id){
     </div>
   `;
   imprimirA4();
+}
+
+// Mede o documento numa folha A4 invisível (com o CSS de impressão) e, se passar
+// de uma página, reduz o conteúdo (zoom) para caber numa folha só. Mínimo 55%.
+function caberEmUmaPagina(el){
+  el.style.zoom='';
+  try{
+    let css='';
+    for(const ss of document.styleSheets){
+      let rules;try{rules=ss.cssRules;}catch(e){continue;}
+      for(const r of rules){if(r.media&&/print/.test(r.media.mediaText))for(const x of r.cssRules)css+=x.cssText+'\n';}
+    }
+    const fr=document.createElement('iframe');
+    fr.style.cssText='position:fixed;left:-10000px;top:0;width:794px;height:1123px;border:0;visibility:hidden';
+    document.body.appendChild(fr);
+    const d=fr.contentDocument;
+    d.open();d.write('<!doctype html><html><head><meta charset="utf-8"><style>'+css+'</style></head><body><div id="print-area">'+document.getElementById('print-area').innerHTML+'</div></body></html>');d.close();
+    const pa=d.getElementById('print-area'),inner=pa.firstElementChild;
+    const cs=fr.contentWindow.getComputedStyle(pa);
+    const disponivel=1100-parseFloat(cs.paddingTop)-parseFloat(cs.paddingBottom);
+    const altura=inner.getBoundingClientRect().height;
+    fr.remove();
+    if(altura>disponivel)el.style.zoom=Math.max(0.55,Math.floor(disponivel/altura*100)/100);
+  }catch(e){console.warn('caberEmUmaPagina',e);}
 }
 
 function imprimirFatura(id){
@@ -2802,9 +2847,13 @@ function imprimirFatura(id){
         ${mediasHtml}
         ${tt.desc>0?`<div class="p-resumo-nota">Economia de <strong>${fmtMoney(tt.desc)}</strong> nesta fatura.</div>`:''}
       </div>`:'');
-  document.getElementById('print-area').innerHTML=`
+  const stLabel={pendente:'Pendente',paga:'Paga',parcial:'Parcialmente paga',cancelada:'Cancelada'}[f.status]||f.status||'Pendente';
+  const meta=[['Emissão',fmtDate(today())],f.venc?['Vencimento',fmtDate(f.venc)]:null,f.periodo?['Período',escTxt(f.periodo)]:null].filter(Boolean);
+  const pgto=[['Forma de pagamento',escTxt(f.forma||'—')],['Status',stLabel],f.dataPgto?['Pago em',fmtDate(f.dataPgto)]:null].filter(Boolean);
+  const area=document.getElementById('print-area');
+  area.innerHTML=`<div class="p-fatura">
     <div class="p-header">
-      ${logoSrc?`<img src="${logoSrc}" alt="Logo" style="height:43px;max-width:192px;object-fit:contain">`:'<div style="font-size:18px;font-weight:800">Gabriel Gomes<br><span style="font-size:12px;font-weight:400;letter-spacing:2px;text-transform:uppercase">Videomaker</span></div>'}
+      ${logoSrc?`<img src="${logoSrc}" alt="Logo" style="height:40px;max-width:192px;object-fit:contain">`:'<div style="font-size:17px;font-weight:800">Gabriel Gomes<br><span style="font-size:11px;font-weight:400;letter-spacing:2px;text-transform:uppercase">Videomaker</span></div>'}
       <div class="p-header-right">
         <div class="p-doc-type">Fatura</div>
         <div class="p-doc-num">Nº ${String(num).padStart(4,'0')}</div>
@@ -2812,21 +2861,15 @@ function imprimirFatura(id){
     </div>
     <hr class="p-divider">
 
-    <div class="p-dates">
-      <div class="p-date-box">
-        <div class="pdl">Data de emissão</div>
-        <div class="pdv">${fmtDate(today())}</div>
+    <div class="pf-topo">
+      <div>
+        <div class="p-section-label">Cliente</div>
+        <div class="p-cliente-nome">${escTxt(c.nome||'—')}</div>
+        ${c.doc?`<div class="p-cliente-doc">CPF/CNPJ: ${escTxt(c.doc)}</div>`:''}
+        ${c.email||c.tel?`<div class="p-cliente-extra">${escTxt([c.email,c.tel].filter(Boolean).join(' · '))}</div>`:''}
+        ${c.endereco?`<div class="p-cliente-extra">${escTxt(c.endereco)}</div>`:''}
       </div>
-      ${f.venc?`<div class="p-date-box"><div class="pdl">Vencimento</div><div class="pdv">${fmtDate(f.venc)}</div></div>`:''}
-      ${f.periodo?`<div class="p-date-box"><div class="pdl">Período</div><div class="pdv">${f.periodo}</div></div>`:''}
-    </div>
-
-    <div class="p-section">
-      <div class="p-section-label">Cliente</div>
-      <div class="p-cliente-nome">${c.nome||'—'}</div>
-      <div class="p-cliente-doc">CPF/CNPJ: ${c.doc||'—'}</div>
-      ${c.email||c.tel?`<div class="p-cliente-extra">${[c.email,c.tel].filter(Boolean).join(' · ')}</div>`:''}
-      ${c.endereco?`<div class="p-cliente-extra">${c.endereco}</div>`:''}
+      <div class="pf-meta">${meta.map(([l,v])=>`<div><span>${l}</span><strong>${v}</strong></div>`).join('')}</div>
     </div>
 
     <div class="p-section">
@@ -2842,18 +2885,14 @@ function imprimirFatura(id){
       <div class="p-extenso">${numeroPorExtenso(tot)}</div>
     </div>
 
-    <div class="p-section">
-      <div class="p-section-label">Pagamento</div>
-      <div class="p-pgto-row"><span class="p-pgto-label">Forma</span><span class="p-pgto-val">${f.forma||'—'}</span></div>
-      <div class="p-pgto-row"><span class="p-pgto-label">Status</span><span class="p-pgto-val">${f.status||'Pendente'}</span></div>
-      ${f.dataPgto?`<div class="p-pgto-row"><span class="p-pgto-label">Data do pagamento</span><span class="p-pgto-val">${fmtDate(f.dataPgto)}</span></div>`:''}
-    </div>
+    <div class="pf-pgto">${pgto.map(([l,v])=>`<span>${l}: <strong>${v}</strong></span>`).join('')}</div>
 
     <div class="p-signs">
       <div class="p-sign">Assinatura do prestador<strong>Gabriel Gomes</strong></div>
-      <div class="p-sign">Assinatura do cliente<strong>${c.nome||''}</strong></div>
+      <div class="p-sign">Assinatura do cliente<strong>${escTxt(c.nome||'')}</strong></div>
     </div>
-  `;
+  </div>`;
+  caberEmUmaPagina(area.querySelector('.p-fatura'));
   imprimirA4();
 }
 
@@ -2986,7 +3025,7 @@ function imprimirRecibo(id){
     <div class="p-section">
       <div class="p-section-label">Cliente</div>
       <div class="p-cliente-nome">${c.nome||'—'}</div>
-      <div class="p-cliente-doc">CPF/CNPJ: ${c.doc||'—'}</div>
+      ${c.doc?`<div class="p-cliente-doc">CPF/CNPJ: ${c.doc}</div>`:''}
       ${c.email||c.tel?`<div class="p-cliente-extra">${[c.email,c.tel].filter(Boolean).join(' · ')}</div>`:''}
       ${c.endereco?`<div class="p-cliente-extra">${c.endereco}</div>`:''}
     </div>
