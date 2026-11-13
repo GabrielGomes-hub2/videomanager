@@ -302,6 +302,17 @@ input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--ac
   .p-resumo-desc{color:#0a7a3d;font-weight:600}
   .p-resumo-desc em{color:#0a7a3d;border:1px solid #0a7a3d;border-radius:3px;padding:1px 5px}
   .p-resumo-total{border-top:1px solid #111;margin-top:4px;padding-top:10px;font-size:17px;font-weight:800}
+  .p-items-table .p-col-qtd{width:52px;text-align:center}
+  .p-items-table .p-item-obs{font-size:11px;color:#555;margin-top:3px;white-space:pre-line;line-height:1.45}
+  .p-resumo-extra{page-break-inside:avoid;break-inside:avoid}
+  .p-medias{display:flex;gap:8px;margin:12px 0 4px}
+  .p-media-box{flex:1;border:1px solid #ccc;border-radius:4px;padding:8px 10px}
+  .p-media-box .pml{font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#888}
+  .p-media-box .pmv{font-size:15px;font-weight:800;color:#111;margin-top:3px;white-space:nowrap}
+  .p-media-box .pms{font-size:9.5px;color:#888;margin-top:1px}
+  .p-media-verde .pmv{color:#0a7a3d}
+  .p-media-dest{border:1.5px solid #0a7a3d;background:#eef8f1}
+  .p-media-dest .pml,.p-media-dest .pmv,.p-media-dest .pms{color:#0a7a3d}
   .p-resumo-nota{margin:8px 8px 4px;padding:9px 12px;background:#eef8f1;border-left:3px solid #0a7a3d;font-size:11.5px;color:#1c4a2e}
 
   /* PAGAMENTO */
@@ -1687,9 +1698,11 @@ function renderTrabalhos(){
 
   // calcular totais dos trabalhos filtrados
   const totalFiltrado=trabs.reduce((s,t)=>s+Number(t.valor||0),0);
-  const totalPago=trabs.filter(t=>t.situacao==='pago').reduce((s,t)=>s+Number(t.valorPago||t.valor||0),0);
-  const totalNaoPago=trabs.filter(t=>t.situacao==='nao_pago'||t.situacao==='em_fatura').reduce((s,t)=>s+(Number(t.valor||0)-Number(t.valorPago||0)),0);
-  const totalEmFatura=trabs.filter(t=>t.situacao==='em_fatura').reduce((s,t)=>s+Number(t.valor||0),0);
+  // trabalhos em fatura com desconto entram pelo valor já descontado
+  const fd=fatorDescTrab();
+  const totalPago=trabs.filter(t=>t.situacao==='pago').reduce((s,t)=>s+Number(t.valorPago||t.valor||0)*fd(t.id),0);
+  const totalNaoPago=trabs.filter(t=>t.situacao==='nao_pago'||t.situacao==='em_fatura').reduce((s,t)=>s+Math.max(0,Number(t.valor||0)*fd(t.id)-Number(t.valorPago||0)),0);
+  const totalEmFatura=trabs.filter(t=>t.situacao==='em_fatura').reduce((s,t)=>s+Number(t.valor||0)*fd(t.id),0);
   const totaisEl=document.getElementById('trab-totais');
   if(trabs.length){
     totaisEl.style.display='flex';
@@ -1737,7 +1750,7 @@ function renderTrabalhos(){
     const fid=fat?fat.id:'sem_fatura';
     if(!gruposFatura[fid])gruposFatura[fid]={fat,trabs:[],total:0};
     gruposFatura[fid].trabs.push(t);
-    gruposFatura[fid].total+=Number(t.valor||0);
+    gruposFatura[fid].total+=Number(t.valor||0)*fd(t.id);
   });
 
   // linha normal
@@ -2213,8 +2226,10 @@ function carregarTrabalhosFatura(){
   semCliente.style.display='none';
 
   // trabalhos captados (executados) e não pagos deste cliente, ordenados por data
+  const fatEdit=DB.get('faturas').find(x=>x.id===document.getElementById('fat-id').value);
+  const idsNaFatura=new Set(((fatEdit&&fatEdit.itens)||[]).map(i=>i.trabId).filter(Boolean));
   const trabs=DB.get('trabalhos')
-    .filter(t=>t.clienteId===cid&&(t.situacao==='nao_pago'||t.situacao==='em_fatura'))
+    .filter(t=>t.clienteId===cid&&(t.situacao==='nao_pago'||t.situacao==='em_fatura'||idsNaFatura.has(t.id)))
     .sort((a,b)=>{
       const da=a.dataCaptacao||'0000-00-00';
       const db=b.dataCaptacao||'0000-00-00';
@@ -2238,21 +2253,34 @@ function carregarTrabalhosFatura(){
       <input type="number" id="fval-${t.id}" placeholder="R$ valor" step="0.01" style="display:none"
         value="${t.valor||''}"
         oninput="atualizaValorFatTrab('${t.id}',this.value)">
+      <div id="fdet-${t.id}" style="display:none;grid-column:2/4">
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">
+          <span style="font-size:11px;color:var(--text3)">Qtd. de vídeos neste trabalho</span>
+          <input type="number" id="fqtd-${t.id}" min="1" step="1" value="${qtdVideosDe(t.titulo)}" style="width:70px" oninput="atualizaItemFat('${t.id}','qtd',parseInt(this.value)||1)">
+        </div>
+        <textarea id="fobs-${t.id}" rows="2" placeholder="Detalhes que aparecem na fatura (vídeos gravados, títulos...)" oninput="atualizaItemFat('${t.id}','obs',this.value)">${escTxt(t.obs)}</textarea>
+      </div>
     </div>
   `).join('');
   calcFatTotal();
 }
 
+function escTxt(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+// quantidade de vídeos de um trabalho: tenta ler do título ("8 VIDEOS"), senão 1
+function qtdVideosDe(titulo){const m=/(\d+)\s*v[ií]deos?/i.exec(titulo||'');return m?Math.max(1,parseInt(m[1])):1;}
+function atualizaItemFat(id,campo,val){if(fatTrabSel[id])fatTrabSel[id][campo]=val;}
 function escHtml(s){return(s||'').replace(/'/g,"\\'").replace(/"/g,'&quot;');}
 
 function toggleFatTrab(id,titulo,checked){
   const vi=document.getElementById('fval-'+id);
+  const det=document.getElementById('fdet-'+id);
   if(checked){
-    vi.style.display='block';
+    vi.style.display='block';det.style.display='block';
     const t=DB.get('trabalhos').find(x=>x.id===id);
-    fatTrabSel[id]={trabId:id,desc:titulo,dataCaptacao:t?t.dataCaptacao:null,valor:parseFloat(vi.value)||0};
+    fatTrabSel[id]={trabId:id,desc:titulo,dataCaptacao:t?t.dataCaptacao:null,valor:parseFloat(vi.value)||0,
+      qtd:parseInt(document.getElementById('fqtd-'+id).value)||1,obs:document.getElementById('fobs-'+id).value};
   } else {
-    vi.style.display='none';
+    vi.style.display='none';det.style.display='none';
     delete fatTrabSel[id];
   }
   calcFatTotal();
@@ -2300,6 +2328,16 @@ function resumoTrabFat(){
   const pendAvulso=trabs.filter(t=>(t.situacao==='nao_pago'||t.situacao==='em_fatura')&&!emAberta.has(t.id)&&!emPaga.has(t.id))
     .reduce((s,t)=>s+Math.max(0,Number(t.valor||0)-Number(t.valorPago||0)),0);
   return{pagosAvulsos,recebidoAvulso,pendente:pendFaturas+pendAvulso};
+}
+// Fator do desconto da fatura em que o trabalho está (1 = sem desconto / sem fatura).
+function fatorDescTrab(){
+  const mapa={};
+  DB.get('faturas').forEach(f=>{
+    if(f.status==='cancelada')return;
+    const t=fatTotais(f);const fator=t.bruto?t.liquido/t.bruto:1;
+    (f.itens||[]).forEach(i=>{if(i.trabId)mapa[i.trabId]=fator;});
+  });
+  return id=>mapa[id]===undefined?1:mapa[id];
 }
 function fmtPct(p){return (Math.round(p*10)/10).toString().replace('.',',')+'%';}
 
@@ -2441,7 +2479,13 @@ function editFatura(id){
     if(item.trabId){
       const cb=document.getElementById('ftc-'+item.trabId);
       const vi=document.getElementById('fval-'+item.trabId);
-      if(cb){cb.checked=true;fatTrabSel[item.trabId]={trabId:item.trabId,desc:item.desc,dataCaptacao:item.dataCaptacao||null,valor:item.valor||0};}
+      if(cb){
+        const fq=document.getElementById('fqtd-'+item.trabId),fo=document.getElementById('fobs-'+item.trabId);
+        if(item.qtd)fq.value=item.qtd;
+        if(item.obs!==undefined)fo.value=item.obs;
+        document.getElementById('fdet-'+item.trabId).style.display='block';
+        cb.checked=true;fatTrabSel[item.trabId]={trabId:item.trabId,desc:item.desc,dataCaptacao:item.dataCaptacao||null,valor:item.valor||0,qtd:parseInt(fq.value)||1,obs:fo.value};
+      }
       if(vi){vi.style.display='block';vi.value=item.valor||'';}
     } else {
       const idx=fatExtras.length;
@@ -2712,7 +2756,9 @@ function imprimirFatura(id){
     const t=i.trabId?trabsAll.find(x=>x.id===i.trabId):null;
     const ag=t&&t.agendaId?agendasAll.find(a=>a.id===t.agendaId):null;
     const hora=ag&&ag.data&&ag.data.includes('T')?ag.data.split('T')[1].slice(0,5):'';
-    return{...i,ord,hora,data:i.dataCaptacao||(t&&t.dataCaptacao)||''};
+    const qtd=i.trabId?(Number(i.qtd)||qtdVideosDe(i.desc)):0;
+    const obs=(i.obs!==undefined?i.obs:(t&&t.obs)||'').trim();
+    return{...i,ord,hora,qtd,obs,data:i.dataCaptacao||(t&&t.dataCaptacao)||''};
   }).sort((a,b)=>{
     if(!a.data&&!b.data)return a.ord-b.ord;
     if(!a.data)return 1;if(!b.data)return -1;
@@ -2722,26 +2768,40 @@ function imprimirFatura(id){
     <tr>
       <td class="p-col-n">${String(n+1).padStart(2,'0')}</td>
       <td class="p-col-data">${i.data?fmtDate(i.data):'—'}</td>
-      <td><span style="font-weight:600">${i.desc}</span></td>
-      <td>${fmtMoney(i.valor)}</td>
+      <td><span style="font-weight:600">${escTxt(i.desc)}</span>${i.obs?`<div class="p-item-obs">${escTxt(i.obs)}</div>`:''}</td>
+      <td class="p-col-qtd">${i.qtd||'—'}</td>
+      <td>${fmtMoney(i.valor)}${i.qtd>1?`<div class="p-item-date">${fmtMoney(i.valor/i.qtd)} por vídeo</div>`:''}</td>
     </tr>
   `).join('');
 
-  // resumo: quantidade × valor cheio, desconto e total
-  const nVid=itens.filter(i=>i.trabId).length;
-  const soVideos=nVid>0&&nVid===itens.length;
-  const valores=[...new Set(itens.map(i=>Number(i.valor||0)))];
-  const uniforme=soVideos&&valores.length===1&&valores[0]>0;
-  const qtdLabel=soVideos?`${nVid} vídeo${nVid>1?'s':''}`:`${itens.length} ite${itens.length>1?'ns':'m'}`;
-  const subLabel=uniforme?`${qtdLabel} × ${fmtMoney(valores[0])}`:qtdLabel;
-  const motivo=(f.desconto&&f.desconto.motivo)||(soVideos?'Desconto por volume de vídeos':'Desconto');
-  const resumoHtml=tt.desc>0?`
-      <div class="p-resumo">
-        <div class="p-resumo-row"><span>Subtotal <em>${subLabel}</em></span><span>${fmtMoney(tt.bruto)}</span></div>
-        <div class="p-resumo-row p-resumo-desc"><span>${motivo} <em>${fmtPct(tt.pct)}</em></span><span>− ${fmtMoney(tt.desc)}</span></div>
-        <div class="p-resumo-row p-resumo-total"><span>Total a pagar</span><span>${fmtMoney(tot)}</span></div>
-        <div class="p-resumo-nota">Economia de <strong>${fmtMoney(tt.desc)}</strong> nesta fatura.</div>
+  // resumo: quantidade de vídeos, médias por vídeo, desconto e total
+  const itensVid=itens.filter(i=>i.trabId);
+  const nExtras=itens.length-itensVid.length;
+  const totalVid=itensVid.reduce((s,i)=>s+i.qtd,0);
+  const brutoVid=itensVid.reduce((s,i)=>s+Number(i.valor||0),0);
+  const media=totalVid?brutoVid/totalVid:0;
+  const mediaDesc=tt.bruto?media*tt.liquido/tt.bruto:media;
+  const plural=(n,s,p)=>`${n} ${n===1?s:p}`;
+  const qtdLabel=[totalVid?plural(totalVid,'vídeo','vídeos'):'',nExtras?plural(nExtras,'item extra','itens extras'):''].filter(Boolean).join(' + ');
+  const motivo=(f.desconto&&f.desconto.motivo)||(totalVid?'Desconto por volume de vídeos':'Desconto');
+  const box=(l,v,s,cls)=>`<div class="p-media-box ${cls||''}"><div class="pml">${l}</div><div class="pmv">${v}</div>${s?`<div class="pms">${s}</div>`:''}</div>`;
+  const mediasHtml=totalVid?`
+      <div class="p-medias">
+        ${box('Total de vídeos',totalVid,itensVid.length!==totalVid?`em ${plural(itensVid.length,'trabalho','trabalhos')}`:'')}
+        ${box('Média por vídeo',fmtMoney(media),tt.desc>0?'valor sem desconto':'')}
+        ${tt.desc>0?box('Desconto por vídeo','− '+fmtMoney(media-mediaDesc),fmtPct(tt.pct)+' de desconto','p-media-verde'):''}
+        ${tt.desc>0?box('Com desconto',fmtMoney(mediaDesc),'por vídeo','p-media-dest'):''}
       </div>`:'';
+  const resumoHtml=(tt.desc>0?`
+      <div class="p-resumo">
+        <div class="p-resumo-row"><span>Subtotal <em>${qtdLabel}</em></span><span>${fmtMoney(tt.bruto)}</span></div>
+        <div class="p-resumo-row p-resumo-desc"><span>${escTxt(motivo)} <em>${fmtPct(tt.pct)}</em></span><span>− ${fmtMoney(tt.desc)}</span></div>
+        <div class="p-resumo-row p-resumo-total"><span>Total a pagar</span><span>${fmtMoney(tot)}</span></div>
+      </div>`:'')+(mediasHtml||tt.desc>0?`
+      <div class="p-resumo-extra">
+        ${mediasHtml}
+        ${tt.desc>0?`<div class="p-resumo-nota">Economia de <strong>${fmtMoney(tt.desc)}</strong> nesta fatura.</div>`:''}
+      </div>`:'');
   document.getElementById('print-area').innerHTML=`
     <div class="p-header">
       ${logoSrc?`<img src="${logoSrc}" alt="Logo" style="height:43px;max-width:192px;object-fit:contain">`:'<div style="font-size:18px;font-weight:800">Gabriel Gomes<br><span style="font-size:12px;font-weight:400;letter-spacing:2px;text-transform:uppercase">Videomaker</span></div>'}
@@ -2772,10 +2832,10 @@ function imprimirFatura(id){
     <div class="p-section">
       <div class="p-section-label">Serviços prestados</div>
       <table class="p-items-table">
-        <thead><tr><th>Nº</th><th>Data</th><th>Descrição</th><th>Valor</th></tr></thead>
+        <thead><tr><th>Nº</th><th>Data</th><th>Descrição</th><th class="p-col-qtd">Vídeos</th><th>Valor</th></tr></thead>
         <tbody>${itensRows}</tbody>
         ${tt.desc>0?'':`<tfoot>
-          <tr><td colspan="3">Total <span style="font-size:11px;font-weight:400;color:#777">${qtdLabel}</span></td><td>${fmtMoney(tot)}</td></tr>
+          <tr><td colspan="4">Total <span style="font-size:11px;font-weight:400;color:#777">${qtdLabel}</span></td><td>${fmtMoney(tot)}</td></tr>
         </tfoot>`}
       </table>
       ${resumoHtml}
