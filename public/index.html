@@ -1375,13 +1375,13 @@ function renderDashboard(){
   const faturas=DB.get('faturas');
 
   // stats financeiras: soma trabalhos pagos + cobrancas pagas + faturas pagas
-  const trabPago=trabalhos.filter(t=>t.situacao==='pago').reduce((s,t)=>s+Number(t.valor||0),0);
+  const rtf=resumoTrabFat();
+  const trabPago=rtf.recebidoAvulso;
   const cobPago=cobrancas.filter(c=>c.pago).reduce((s,c)=>s+Number(c.valor||0),0);
   const fatPago=faturas.filter(f=>f.status==='paga').reduce((s,f)=>s+fatTotais(f).liquido,0);
   const totalRec=trabPago+cobPago+fatPago;
 
-  const trabalhosPendentes=trabalhos.filter(t=>t.situacao==='nao_pago'||t.situacao==='em_fatura');
-  const totalPend=trabalhosPendentes.reduce((soma,t)=>soma+(Number(t.valor||0)-Number(t.valorPago||0)),0);
+  const totalPend=rtf.pendente;
 
   const clAtivos=DB.get('clientes').filter(c=>c.status==='ativo').length;
 
@@ -2079,12 +2079,12 @@ function renderFinanceiro(){
   const allFats=DB.get('faturas');
   const recTot=[
     ...allCobs.filter(c=>c.pago).map(c=>c.valor),
-    ...allTrabs.filter(t=>t.situacao==='pago').map(t=>t.valor||0),
+    resumoTrabFat().recebidoAvulso,
     ...allFats.filter(f=>f.status==='paga').map(f=>fatTotais(f).liquido)
   ].reduce((s,v)=>s+Number(v),0);
   const pendTot=[
     ...allCobs.filter(c=>!c.pago).map(c=>c.valor),
-    ...allTrabs.filter(t=>t.situacao==='nao_pago'||t.situacao==='em_fatura').map(t=>t.valor||0)
+    resumoTrabFat().pendente
   ].reduce((s,v)=>s+Number(v),0);
   const mesAtual=new Date().getMonth();const anoAtual=new Date().getFullYear();
   const mesMes=allCobs.filter(c=>c.pago&&c.dataPgto&&new Date(c.dataPgto).getMonth()===mesAtual&&new Date(c.dataPgto).getFullYear()===anoAtual).reduce((s,c)=>s+Number(c.valor||0),0);
@@ -2284,6 +2284,22 @@ function fatTotais(f){
   let desc=d.tipo==='valor'?Number(d.valor||0):bruto*Number(d.valor||0)/100;
   desc=Math.round(Math.min(Math.max(desc||0,0),bruto)*100)/100;
   return{bruto,desc,liquido:Math.round((bruto-desc)*100)/100,pct:bruto?desc/bruto*100:0};
+}
+// Evita contar o mesmo vídeo duas vezes: trabalho que está em fatura entra pelo valor
+// da fatura (já com desconto); só os trabalhos avulsos entram pelo próprio valor.
+function resumoTrabFat(){
+  const fats=DB.get('faturas'),trabs=DB.get('trabalhos');
+  const emPaga=new Set(),emAberta=new Set();
+  fats.forEach(f=>{
+    if(f.status==='cancelada')return;
+    (f.itens||[]).forEach(i=>{if(i.trabId)(f.status==='paga'?emPaga:emAberta).add(i.trabId);});
+  });
+  const pagosAvulsos=trabs.filter(t=>t.situacao==='pago'&&!emPaga.has(t.id));
+  const recebidoAvulso=pagosAvulsos.reduce((s,t)=>s+Number(t.valorPago||t.valor||0),0);
+  const pendFaturas=fats.filter(f=>f.status!=='paga'&&f.status!=='cancelada').reduce((s,f)=>s+fatTotais(f).liquido,0);
+  const pendAvulso=trabs.filter(t=>(t.situacao==='nao_pago'||t.situacao==='em_fatura')&&!emAberta.has(t.id)&&!emPaga.has(t.id))
+    .reduce((s,t)=>s+Math.max(0,Number(t.valor||0)-Number(t.valorPago||0)),0);
+  return{pagosAvulsos,recebidoAvulso,pendente:pendFaturas+pendAvulso};
 }
 function fmtPct(p){return (Math.round(p*10)/10).toString().replace('.',',')+'%';}
 
@@ -3049,7 +3065,7 @@ function renderCaixa(){
   // entradas automáticas (só para os cards de resumo)
   const cobrancas=DB.get('cobrancas').filter(c=>c.pago);
   const faturas=DB.get('faturas').filter(f=>f.status==='paga');
-  const trabalhos=DB.get('trabalhos').filter(t=>t.situacao==='pago'&&t.valor>0);
+  const trabalhos=resumoTrabFat().pagosAvulsos.filter(t=>t.valor>0);
   const saidas=DB.get('saidas');
 
   const entradas=[
